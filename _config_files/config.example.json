@@ -1,0 +1,7 @@
+{
+	"base_url": "https://zsapi.<cloud>.net/api/v1",
+	"admin": "<admin account>",
+	"password": "<admin password>",
+	"api_key": "<api key>",
+	"csb_url": "https://csbapi.<cloud>.net"
+}
