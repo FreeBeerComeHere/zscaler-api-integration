@@ -31,13 +31,13 @@ cloud_app_types = [
 class URL:
     def __init__(self, url):
         self.url = url.strip('\n')
-        self.domain = self.__extract_domain(self.url)
+        # self.domain = self._extract_domain(self.url)
         self.default_url_category = ''
         self.security_classifiction = ''
         self.custom_url_categories = ''
         self.url_details = {
             "Url": self.url,
-            "Domain": self.__extract_domain(self.url),
+            # "Domain": self._extract_domain(self.url),
             "Zscaler default URL category": '',
             "Zscaler security classification": '',
             "Custom URL categories": ''
@@ -49,14 +49,14 @@ class URL:
     def __repr__(self) -> str:
         return f'This is a URL: {self.url_details}'
     
-    def __extract_domain(self, url :str):
-        if not re.search('co.uk', url):
-            domain = url.split('.')
-            domain = domain[-2]+'.'+domain[-1]
-        else:
-            domain = url.split('.')
-            domain = domain[-3]+'.'+domain[-2]+'.'+domain[-1]
-        return domain
+    # def _extract_domain(self, url :str):
+    #     if not re.search('co.uk', url):
+    #         domain = url.split('.')
+    #         domain = domain[-2]+'.'+domain[-1]
+    #     else:
+    #         domain = url.split('.')
+    #         domain = domain[-3]+'.'+domain[-2]+'.'+domain[-1]
+    #     return domain
         
 class URLCat:
     def __init__(self, name, urlcontents, keywords):
@@ -370,7 +370,6 @@ class API():
             # print(f'This is what were sending to lookup: {url_chunk_100}')
             response = self._call_api(method='post', url=url, data=json.dumps(url_chunk_100))
             # print(response.status_code)
-            # print(response.text)
             all_responses += json.loads(response.text)
             print(f'Looked up {len(all_responses)} URLs.')
             # print(all_responses)
@@ -444,8 +443,8 @@ class API():
         for url in looked_up_urls:
             if type(url) == dict:
                 u = URL(url['url'])
-                u.url_details['Zscaler default URL category'] = url['urlClassifications']
-                u.url_details['Zscaler security classification'] = url['urlClassificationsWithSecurityAlert']
+                u.url_details['Zscaler default URL category'] = ', '.join(url['urlClassifications'])
+                u.url_details['Zscaler security classification'] = ', '.join(url['urlClassificationsWithSecurityAlert'])
                 url_objects.append(u)
             else:
                 print(f'"{url}" is {type(url)}, not dict. Skipping.')
