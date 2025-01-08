@@ -168,3 +168,4 @@ cython_debug/
 /_config_files/config-*.json
 sessionid.txt
 main.py
+*.txt
