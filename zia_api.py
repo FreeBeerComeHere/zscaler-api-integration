@@ -1,3 +1,5 @@
+from url import URL
+from cloud_app_url_mapping import CloudAppURLMapping
 import mimetypes
 import pandas as pd
 import re
@@ -5,6 +7,8 @@ import json
 import time
 import requests
 import os
+
+DEBUG = True
 
 cloud_app_types = [
   "SOCIAL_NETWORKING",
@@ -28,36 +32,8 @@ cloud_app_types = [
   "AI_ML"
 ]
 
-class URL:
-    def __init__(self, url):
-        self.url = url.strip('\n')
-        # self.domain = self._extract_domain(self.url)
-        self.default_url_category = ''
-        self.security_classifiction = ''
-        self.custom_url_categories = ''
-        self.url_details = {
-            "Url": self.url,
-            # "Domain": self._extract_domain(self.url),
-            "Zscaler default URL category": '',
-            "Zscaler security classification": '',
-            "Custom URL categories": ''
-        }
-         
-    def __str__(self) -> str:
-        return f'This is a URL: {self.url_details}'
+
     
-    def __repr__(self) -> str:
-        return f'This is a URL: {self.url_details}'
-    
-    # def _extract_domain(self, url :str):
-    #     if not re.search('co.uk', url):
-    #         domain = url.split('.')
-    #         domain = domain[-2]+'.'+domain[-1]
-    #     else:
-    #         domain = url.split('.')
-    #         domain = domain[-3]+'.'+domain[-2]+'.'+domain[-1]
-    #     return domain
-        
 class URLCat:
     def __init__(self, name, urlcontents, keywords):
         self.name = name
@@ -65,7 +41,7 @@ class URLCat:
         self.keywords = keywords
         
     def __str__(self) -> str:
-        return f'This is a URL category: Name: {self.name}, URLcontents:{self.urlcontents}, Keywords:{self.keywords}'
+        return f'This is a URL category: Name: {self.name}, URLcontents: {self.urlcontents}, Keywords: {self.keywords}'
 
 class URLCategories:
     def __init__(self) -> None:
@@ -195,13 +171,12 @@ class API():
             print('ERROR: POSTing without data!')
             raise RuntimeError('POSTing without data!')
         else:
-            data = ''
-            if 'data' in kwargs:
-                data = kwargs['data']
+            data = kwargs['data'] if 'data' in kwargs else ''
+            params = kwargs['params'] if 'params' in kwargs else ''
             cookies={'JSESSIONID': self.sessionId }
             retry_required = True
             while retry_required:
-                response = requests.request(method=method, url=url, cookies=cookies, headers=self.headers, data=data)
+                response = requests.request(method=method, url=url, cookies=cookies, headers=self.headers, data=data, params=params)
                 
                 if response.status_code == 429:
                     # Rate limit exceeded
@@ -228,33 +203,26 @@ class API():
             return response
     def activate(self):
         url = '/status/activate'
-        cookies={'JSESSIONID': self.sessionId }
-        payload={}
-        
-        response = requests.request("POST", self.base_url + url, cookies=cookies, data=payload)
+        data={}        
+        # response = requests.request("POST", self.base_url + url, cookies=cookies, data=payload)
+        response = self._call_api('post', url=url, data=data)
         activateStatusCode = str(response.status_code)
         print(f"Activation attempted, return code is: {activateStatusCode}")
     def get_location_overview(self, location_id=0):
-        if location_id == 0:
-            url = '/locations'
-        else:
-            url = f'/locations/{location_id}'
+        url = '/locations' if location_id == 0 else f'/locations/{location_id}'
+        data={}
         
-        payload={}
-        
-        response = self._call_api(method="get", url=url, data=payload)
+        response = self._call_api(method="get", url=url, data=data)
         # print(response.text)
         print(json.dumps(json.loads(response.text),indent=5))
     def get_sublocation_overview(self, parent_location_id):
         url = f'/locations/{parent_location_id}/sublocations'
-        
-        response = self._call_api(method="get", url=url)
+        response = self._call_api(method='get', url=url)
         sublocations = json.loads(response.text)
         list_of_sublocation_ids = [sublocation['id'] for sublocation in sublocations]
         return list_of_sublocation_ids
     def add_sublocation(self, parent_location_id, name, ipaddresses:list):
         url = '/locations'
-        
         payload = {
             "name": name,
             "parentId": parent_location_id,
@@ -271,13 +239,10 @@ class API():
         response = self._call_api(method="delete", url=url)
         print(response.text)   
     def getFWPol(self):
-        print(f"Will now print all Firewall policies")
         url = '/firewallFilteringRules'
-        cookies={'JSESSIONID': self.sessionId }
-        
-        payload={}
-        
-        response = requests.request("GET", self.base_url + url, cookies=cookies, data=payload)
+        data={}
+        # response = requests.request("GET", self.base_url + url, cookies=cookies, data=payload)
+        response = self._call_api(method='get', url=url, data=data)
         responseJSON = json.loads(response.text)
         for i in responseJSON:
             print(i['name'])
@@ -338,10 +303,11 @@ class API():
         response = requests.post(self.base_url + url, cookies=cookies, data=json.dumps(payload))
         print(response.status_code)
         print(response.text)
-    def split_list(self, urllist :list, chunk_size :int =100):
+    def _split_list(self, urllist :list, chunk_size :int =100):
         for i in range(0,len(urllist), chunk_size):
             yield urllist[i:i + chunk_size]
     def url_lookup(self, urls_to_check :list):
+        url = f'/urlLookup'
         """Takes a list of URLs and checks it against the ZS default URL
         categories and security classificiation database
 
@@ -354,24 +320,32 @@ class API():
         # print(f'printing what urllookup received: {urls_to_check} - {len(urls_to_check)} - {type(urls_to_check)}')
         if type(urls_to_check) == list:
             if len(urls_to_check) > 100:
-                urls_to_check = list(self.split_list(urls_to_check))
+                # List has more than 100 items and we need to split it up
+                urls_to_check = list(self._split_list(urls_to_check))
             else:
+                # List has less than 100 items
                 new_list = []
                 new_list.append(urls_to_check)
                 urls_to_check = new_list
+
+        # urls_to_check is a list inside a list!
+        
         elif type(urls_to_check) == str:
             new_list = []
             new_list.append(urls_to_check)
             urls_to_check = new_list
-                          
-        url = f'/urlLookup'
+        
+        else:
+            raise TypeError(f'urls_to_check should be <list> or <str>, received {type(urls_to_check)}')
+        
+        # Look up all URLs in chunks of 100 (this is what the API supports)
         all_responses = []
         for url_chunk_100 in urls_to_check:
             # print(f'This is what were sending to lookup: {url_chunk_100}')
             response = self._call_api(method='post', url=url, data=json.dumps(url_chunk_100))
             # print(response.status_code)
             all_responses += json.loads(response.text)
-            print(f'Looked up {len(all_responses)} URLs.')
+            print(f'Looked up {len(all_responses)} URLs.') if DEBUG else 0
             # print(all_responses)
         print('## FINISHED URL LOOKUP ##')
         return all_responses
@@ -398,8 +372,8 @@ class API():
         # requests.delete(self.base_url + url, cookies=cookies)
         print(f'{response.status_code}')
     def build_custom_url_classifications(self):
+        url = f'/urlCategories?customOnly=true'
         if self.urlcategories.get_len() == 0:
-            url = f'/urlCategories?customOnly=true'
             response = self._call_api(method='get', url=url)
             print(response.status_code)
             custom_urls = json.loads(response.text)
@@ -422,7 +396,14 @@ class API():
     def check_if_url_is_in_urlcategory(self, url_to_check :URL):
         url_cats_for_this_url = self.urlcategories.in_url_categories(url_to_check)
         return url_cats_for_this_url
-    def bulk_url_lookup(self, filename :str, custom_lookup :bool =True, export :bool = False) -> list:
+    def bulk_url_lookup(
+            self,
+            filename :str,
+            custom_lookup :bool =False,
+            export :bool = False,
+            include_cloud_apps :bool = False,
+            cloud_app_mapping_file :str = None
+            ) -> list:
         """Does a bulk lookup of URLs based on a file
 
         Args:
@@ -436,9 +417,9 @@ class API():
         # Read file
         with open(filename, 'r') as file:
             contents = file.readlines()
-            stripped = [url.rstrip('\n') for url in contents]
+            stripped_urls = [url.rstrip('\n') for url in contents]
         # print(stripped)
-        looked_up_urls = self.url_lookup(stripped)        
+        looked_up_urls = self.url_lookup(stripped_urls)
         url_objects = []
         for url in looked_up_urls:
             if type(url) == dict:
@@ -459,6 +440,11 @@ class API():
         # Translate the list of URL objects into a list of dicts
         url_list_of_dicts = [url.url_details for url in url_objects]
         
+        if include_cloud_apps:
+            ca_url_mapping = CloudAppURLMapping(cloud_app_mapping_file)
+            for url in url_objects:
+                ca_url_mapping.add_cloud_app_for_url(url)
+        
         if export:
             # Rework the filename
             path, filename = os.path.split(filename)
@@ -477,6 +463,7 @@ class API():
                 # print(f'Dumping URL data:\n{url_list_of_dicts}')
             else:
                 print(f'File exported successfully: {new_file}')
+                                
         return url_list_of_dicts
     def get_cloud_applications(self, sort :bool =False) -> list:
         """Downloads all Zscaler defined cloud applications and returns them as a (sorted) list of dicts
@@ -552,11 +539,9 @@ class API():
         Args:
             md5 (string): The MD5 checksum of the file you want to download a report for
         """
-        url = f'{self.base_url}/sandbox/report/{md5}'
-        cookies={'JSESSIONID': self.sessionId }
-        
+        url = f'{self.base_url}/sandbox/report/{md5}'       
         params = {'details': 'full'}
-        response = requests.get(url=url, cookies=cookies, params=params)
+        response = self._call_api('get', url=url, params=params)
         print(response)
         print(response.text)
     def get_csb_quota(self):
@@ -729,8 +714,8 @@ class API():
         return int(highest_rule_order)
     def _find_cloud_app_id_and_name(self, querystring):
         page_number = 0
-        reached_end_of_list = False
         list_of_cloud_apps = []
+        reached_end_of_list = False
         while not reached_end_of_list:
             url = f'/cloudApplications/lite?pageNumber={page_number}&limit=10000'
             response = json.loads(self._call_api(method='get', url=url).text)
