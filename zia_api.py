@@ -1,5 +1,5 @@
-from url import URL
-from cloud_app_url_mapping import CloudAppURLMapping
+from src.url import URL
+from src.cloud_app_url_mapping import CloudAppURLMapping
 import mimetypes
 import pandas as pd
 import re
@@ -349,7 +349,7 @@ class API():
             # print(all_responses)
         print('## FINISHED URL LOOKUP ##')
         return all_responses
-    def get_all_url_category_names(self, only_custom :bool = True, get_id :bool = True, get_name :bool = True):
+    def get_all_url_category_id_and_names(self, only_custom :bool = True, get_id :bool = True, get_name :bool = True):
         url = f'/urlCategories?customOnly={str(only_custom).lower()}'
         
         response = self._call_api(method='get', url=url)
@@ -366,6 +366,11 @@ class API():
                     url_dict['name'] = urlcat['id']
             categories.append(url_dict)
         return categories
+    def get_url_category_content(self, id :int):
+        url = f'/urlCategories/{id}'
+        response = self._call_api(method='get', url=url)
+        return response
+    
     def delete_urlcategory(self, catid):
         url = f'/urlCategories/{catid}'
         response = self._call_api(method='delete', url=url)
@@ -395,7 +400,8 @@ class API():
         return self.urlcategories
     def check_if_url_is_in_urlcategory(self, url_to_check :URL):
         url_cats_for_this_url = self.urlcategories.in_url_categories(url_to_check)
-        return url_cats_for_this_url
+        return ', '.join(url_cats_for_this_url)
+        # return url_cats_for_this_url
     def bulk_url_lookup(
             self,
             filename :str,
