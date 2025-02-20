@@ -1,5 +1,5 @@
 
-from url import URL
+from src.url import URL
 
 class CloudAppURLMapping:
     def __init__(self, cloud_app_mapping_file_content_file_path = None):
