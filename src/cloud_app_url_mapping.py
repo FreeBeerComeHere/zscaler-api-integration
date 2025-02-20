@@ -34,7 +34,7 @@ class CloudAppURLMapping:
         # print(url.url_details['Url'])
         for mapping in self.cloud_app_map:
             # print(f'Checking for match between mapping data URL "{mapping['url']}" and URL object URL "{url.url_details['Url']}"')
-            if mapping['url'] == url.url_details['Url']:
+            if mapping['url'] == url.url_details['Url'] or f'.{mapping['url']}' == url.url_details['Url']:
                 # print('Expanding URL object data with cloud app')
                 url.url_details['Cloud App'] = mapping['cloud app']
                 # print(url)
