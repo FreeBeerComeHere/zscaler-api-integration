@@ -1,4 +1,3 @@
-
 from src.url import URL
 
 class CloudAppURLMapping:
